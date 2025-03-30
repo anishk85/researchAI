@@ -9,3 +9,5 @@ huggingface-hub==0.29.3
 requests==2.32.3
 python-dotenv==1.1.0
 langchain-google-genai==2.1.2
+arxiv==2.1.3
+

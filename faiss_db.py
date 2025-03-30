@@ -1,8 +1,8 @@
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
 import os
-from fetch_papers import get_research_papers
 from langchain.docstore.document import Document  # Import the Document class
+from setup_mongo import db, collection  # Import the MongoDB collection
 import shutil
 
 # Load a Hugging Face embedding model
@@ -11,6 +11,19 @@ embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-Mi
 # FAISS database directory
 DB_NAME = "research_papers_faiss"
 
+def fetch_chunks_from_mongo(pdf_url:str):
+    """Fetches chunks from MongoDB for the given `pdf_url`."""
+    paper = collection.find_one({"pdf_url": pdf_url})
+
+    # Check if the document was found
+    if paper is None:
+        raise ValueError(f"No document found in MongoDB for pdf_url: {pdf_url}")
+    
+    return [
+        Document(
+            page_content=chunk, 
+        ) for chunk in paper["text_chunks"]
+    ]   
 
 def delete_faiss_db():
     """Deletes the FAISS database if it exists."""
@@ -20,64 +33,33 @@ def delete_faiss_db():
     else:
         print("ℹ️ No FAISS database found.")
 
-# Function to create FAISS database from processed papers
-def upload_papers_to_faiss(user_query : str ,max_papers : int=5,generate_new :bool =True):
+
+
+
+def upload_chunks(chat_query : str, k : int, generate_new : bool , pdf_url : str):
+    # handle the logic when generate new is false
     if not generate_new and os.path.exists(DB_NAME):
-        vector_db = FAISS.load_local(DB_NAME, 
-                                     embeddings=embedding_model,
-                                     allow_dangerous_deserialization=True  # Explicitly enable for trusted sources
-                                     )   
-        print(f"✅ FAISS database default loaded.")
-        return vector_db
+        print("✅ Loading existing FAISS database...")
+        vector_db = FAISS.load_local(DB_NAME, embeddings=embedding_model, allow_dangerous_deserialization=True)
+        return vector_db.similarity_search(chat_query, k=k)  # Retrieve top-k results
+    
+    #  handle the logic when generate new is true
     if generate_new:
-        delete_faiss_db()  # Delete existing database if generate_new is True
-
-    papers = get_research_papers(user_query,max_papers)  # Get processed papers from fetch_papers.py
-    docs = []
-    
-    for paper in papers:
-        print(paper["pdf_url"])
-        chunk=paper["title"]+paper["abstract"]
-        # for chunk in paper["chunks"]:
-            # Create a Document object for each chunk
-        docs.append(Document(
-            page_content=chunk,  # Chunk text
-            metadata={           # Metadata associated with the chunk
-                "title": paper["title"],  # Paper's title
-                "abstract": paper["abstract"],  # Paper's abstract
-                "pdf_url": paper["pdf_url"],  # URL to the PDF
-                "source": paper["source"],  # Source of the paper (e.g., arXiv)
-                "full_text": paper["full_text"]  # Full text of the paper
-            }   
-    ))
-
-    if not docs:
-        print("❌ No valid text extracted from papers.")
-        return None
-
-    # Check if the FAISS database already exists
-    if os.path.exists(DB_NAME):
-        vector_db = FAISS.load_local(DB_NAME, 
-                                        embeddings=embedding_model,
-                                        allow_dangerous_deserialization=True
-                                        )  # Load the existing database
-        print(f"✅ FAISS database loaded with {len(docs)} existing documents.")
-    
-    else:
-        vector_db = FAISS.from_documents(docs, embedding=embedding_model)
-        print("✅ Created a new FAISS database.")   
+        delete_faiss_db()  # Delete the existing FAISS database if generate_new is True
 
 
-    # Add new papers to the existing database
-    vector_db.add_documents(docs)  # Add new chunks of text to the vector store
-    
-    # Save the vector database locally
-    vector_db.save_local(DB_NAME)
-    print(f"✅ FAISS database updated with {len(docs)} chunks!")
+    # Fetch chunks from MongoDB
+    docs = fetch_chunks_from_mongo(pdf_url)
 
-    return vector_db
+    # Create or update FAISS database
+    vector_db = FAISS.from_documents(docs, embedding=embedding_model)
+    vector_db.save_local(DB_NAME)  # Save changes
+    print(f"✅ FAISS database updated with {len(docs)} chunks.")
+
+    return vector_db.similarity_search(chat_query, k=k)  # Retrieve top-k results
+
 
 # Function to load FAISS database
-def load_faiss_db(user_query="",max_papers=5,generate_new=True):
-    return upload_papers_to_faiss(user_query,max_papers,generate_new)
+def load_faiss_db(chat_query,k,generate_new,pdf_url):
+    return upload_chunks(chat_query,k,generate_new,pdf_url)
 

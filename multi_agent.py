@@ -33,44 +33,41 @@ llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.7)
 # query = "transformers performance were awesome what is blackbox behind it"
 # search_results = faiss_search_tool(query)
 
-# Get fiass db init
-def get_faiss_db(query, max_papers :int =5, generate_new=True):
-    vector_db = load_faiss_db(query,max_papers,generate_new)  # Load the FAISS database
-    return vector_db
-
-# Tool for FAISS Search
-def faiss_search_tool(query : str ,max_papers : int = 5, k : int = 2,generate_new : bool =True):
-    vector_db=get_faiss_db(query, max_papers, generate_new)  # Load the FAISS database
-    # Perform similarity search in the FAISS vector store
-    lats=vector_db.similarity_search(query, k,score_threshold=0.5)
-    print("🔎 Retrieved Papers:", [doc.metadata["title"] for doc in lats])
-    return lats  # Adjust 'k' for the number of results
-2
 # Summarization function
-def summarize_text(text):
-    """Summarizes the content of research papers."""
-    return llm.invoke(f'''Summarize the following text from given papers and also user web search to retrieve more information and then merge it together meaningfully also in response you should not give any type of unrequired symbols or ** or new line characters 
-                      or anything give it clear and plain text and you can also provide links if needed from web search :\n{text}
-    ''')
+def summarize_text(title_abstract : list):
+    """Summarizes each document individually."""
+    
+    summaries = []
+    
+    for doc in title_abstract:
+        summary = llm.invoke(f'''Summarize the following research paper. Use web search if needed 
+                              and ensure the response is clear, plain text with no unnecessary 
+                              symbols, new lines, or formatting characters. Provide links if relevant:
+                              \n{doc}
+        ''')
+        summaries.append(summary.content)
+    
+    return summaries
+
 
 def extract_pagecontent(documents):
-    """Extracts the page content from documents."""
-    return "\n".join([doc.page_content for doc in documents])
+    """Creates a list of formatted strings, each containing a document's title and abstract."""
+    return [f"Title: {doc['title']}\nAbstract: {doc['abstract']}\n" for doc in documents]
 
 # Define Summarization Tool
-summarization_tool = Tool(
-    name="SummarizationTool",
-    func=summarize_text,
-    description="Summarizes content of research papers into a concise and meaningful format to the user."
-)
+# summarization_tool = Tool(
+#     name="SummarizationTool",
+#     func=summarize_text,
+#     description="Summarizes content of research papers into a concise and meaningful format to the user."
+# )
 
 # Summarization Agent
-summarization_agent = initialize_agent( 
-    tools=[summarization_tool], 
-    llm=llm,
-    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-    memory=ConversationBufferMemory()
-)
+# summarization_agent = initialize_agent( 
+#     tools=[summarization_tool], 
+#     llm=llm,
+#     agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+#     memory=ConversationBufferMemory()
+# )
 
 # Citation Agent
 # citation_agent = initialize_agent(
@@ -81,10 +78,15 @@ summarization_agent = initialize_agent(
 # )
 
 # Chat Agent
+def chat_agent(prompt):
+    """Creates a chat agent that can respond to user queries."""
+    return llm.invoke(prompt)
+
+
 # chat_agent = initialize_agent(
 #     tools=[],
 #     llm=llm,
-#     agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+#     agent=AgentType.OPENAI_FUNCTIONS,
 #     memory=ConversationBufferMemory()
 # )
 

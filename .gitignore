@@ -16,3 +16,6 @@ __pycache__/
 *.tox
 *.mypy_cache
 *.pytest_cache
+*faiss
+faiss_index/
+faiss_db/

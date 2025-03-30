@@ -3,9 +3,6 @@ from langchain_community.llms import HuggingFaceHub
 from langchain_community.llms import Ollama
 from langchain.agents import AgentType, initialize_agent
 from langchain.memory import ConversationBufferMemory
-from transformers import pipeline
-from faiss_db import load_faiss_db
-from huggingface_hub import login
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 import os

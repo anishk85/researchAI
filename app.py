@@ -4,6 +4,9 @@ from multi_agent import chat_agent,summarize_text, extract_pagecontent
 from flask_cors import CORS, cross_origin
 from fetch_papers import get_research_papers
 from faiss_db import load_faiss_db
+from dotenv import load_dotenv
+import os 
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app, supports_credentials=False, origins="*")  # Allow all origins
@@ -14,7 +17,7 @@ app.config['CORS_HEADERS'] = 'Content-Type'
 @app.route("/",methods=["GET"])
 @cross_origin()
 def home():
-    return "Welcome to the Research Paper Search API!"
+    return jsonify("Welcome to the Research Paper Chatbot API"), 200
 
 @app.route("/agent/chat",methods=["POST"])
 @cross_origin()
@@ -84,4 +87,4 @@ def fetch_documents():
     return jsonify(search_results), 200
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0",port=5000,debug=True)
+    app.run(host="0.0.0.0",port=os.getenv("PORT"),debug=True)
